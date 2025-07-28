@@ -1,0 +1,9 @@
+Table users {
+  id serial [pk]
+  email varchar(255) [not null]
+  last_login_sub varchar(255)
+  last_login_at timestamp with time zone
+  created_at timestamp with time zone [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp with time zone [default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamp with time zone
+}

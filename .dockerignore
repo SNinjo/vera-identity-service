@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test files
+*_test.go
+test/
+
+# Coverage
+cover.out
+
+# Environment files (should be provided at runtime)
+.env
+.env.example
+
+# Temporary files
+tmp/
+temp/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go specific
+vendor/ 

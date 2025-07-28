@@ -1,0 +1,581 @@
+openapi: 3.0.0
+info:
+  title: Vera Identity Service
+  description: Authentication and authorization service for the Vera ecosystem
+  version: DEV
+
+components:
+  securitySchemes:
+    userAccessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User access token for API calls
+    
+    userRefreshToken:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: HTTP-only refresh token cookie for getting new access tokens
+    
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - code
+        - message
+        - timestamp
+    
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "1970-01-01T00:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "1970-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "1970-01-01T00:00:00Z"
+      required:
+        - id
+        - email
+        - last_login_at
+        - created_at
+        - updated_at
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Check if the service is running
+      tags:
+        - Tool
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+    
+  /unix-timestamp:
+    get:
+      summary: Get Unix timestamp
+      description: Get the current Unix timestamp
+      tags:
+        - Tool
+      responses:
+        '200':
+          description: Unix timestamp
+          content:
+            application/json:
+              schema:
+                type: number
+                example: 0
+
+  /jwt:
+    post:
+      summary: Generate JWT
+      description: Generate a JWT
+      tags:
+        - Tool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                claims:
+                  type: object
+                  properties:
+                    sub:
+                      type: string
+                      example: "1"
+                    email:
+                      type: string
+                      format: email
+                      example: "user@example.com"
+                    picture:
+                      type: string
+                      example: "https://example.com/picture.jpg"
+                secret:
+                  type: string
+                  example: "only-for-test"
+                issuer:
+                  type: string
+                  example: "identity@vera.sninjo.com"
+                issued_at:
+                  type: integer
+                  format: int64
+                  example: 0
+                expired_at:
+                  type: integer
+                  format: int64
+                  example: 0
+      responses:
+        '200':
+          description: JWT generated successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+  /auth/login:
+    get:
+      summary: Initiate Google OAuth login
+      description: Redirects user to Google OAuth for authentication
+      tags:
+        - User
+      responses:
+        '302':
+          description: Redirect to Google OAuth
+          headers:
+            Location:
+              description: URL to redirect to
+              schema:
+                type: string
+                example: "https://accounts.google.com/oauth/authorize?client_id=..."
+
+  /auth/callback:
+    get:
+      summary: OAuth callback handler
+      description: Handle OAuth callback, check if user exists, and issue JWT tokens
+      tags:
+        - User
+      parameters:
+        - name: code
+          in: query
+          description: Authorization code from OAuth provider
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          description: State parameter for CSRF protection
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authentication successful
+          headers:
+            Set-Cookie:
+              description: HTTP-only refresh token cookie
+              schema:
+                type: string
+                example: "refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=None"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT access token
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '404':
+          description: User not found in system
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "404_01_001"
+                message: "User not found"
+                timestamp: "1970-01-01T00:00:00Z"
+        '400':
+          description: Invalid or expired OAuth code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "500_01_002"
+                message: "Invalid or expired OAuth code"
+                timestamp: "1970-01-01T00:00:00Z"
+        '500':
+          description: OAuth processing error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_oauth_code:
+                  summary: Invalid OAuth Code
+                  value:
+                    code: "500_01_002"
+                    message: "Invalid OAuth Code"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_id_token:
+                  summary: Invalid OAuth ID token
+                  value:
+                    code: "500_01_003"
+                    message: "Invalid OAuth ID token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                missing_user_info:
+                  summary: Missing user info from OAuth
+                  value:
+                    code: "500_01_004"
+                    message: "Missing user info from OAuth"
+                    timestamp: "1970-01-01T00:00:00Z"
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Validate refresh token from cookie and issue new access token
+      tags:
+        - User
+      security:
+        - userRefreshToken: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: New JWT access token
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_refresh_token:
+                  summary: Invalid refresh token
+                  value:
+                    code: "401_01_005"
+                    message: "Invalid refresh token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+
+  /users:
+    get:
+      summary: List all users
+      description: Get all users in the system (admin only)
+      tags:
+        - User
+      security:
+        - userAccessToken: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_access_token:
+                  summary: Invalid access token
+                  value:
+                    code: "401_01_006"
+                    message: "Invalid access token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "403_01_011"
+                message: "User not authorized"
+                timestamp: "1970-01-01T00:00:00Z"
+    
+    post:
+      summary: Create new user
+      description: Create a new user account with the specified email
+      tags:
+        - User
+      security:
+        - userAccessToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_access_token:
+                  summary: Invalid access token
+                  value:
+                    code: "401_01_006"
+                    message: "Invalid access token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "403_01_011"
+                message: "User not authorized"
+                timestamp: "1970-01-01T00:00:00Z"
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "409_01_009"
+                message: "User already exists"
+                timestamp: "1970-01-01T00:00:00Z"
+
+  /users/{id}:
+    patch:
+      summary: Update user
+      description: Update user information by ID
+      tags:
+        - User
+      security:
+        - userAccessToken: []
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_access_token:
+                  summary: Invalid access token
+                  value:
+                    code: "401_01_006"
+                    message: "Invalid access token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "403_01_011"
+                message: "User not authorized"
+                timestamp: "1970-01-01T00:00:00Z"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "404_01_001"
+                message: "User not found"
+                timestamp: "1970-01-01T00:00:00Z"
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "409_01_010"
+                message: "Email already in use"
+                timestamp: "1970-01-01T00:00:00Z"
+    
+    delete:
+      summary: Delete user
+      description: Soft delete a user account by ID
+      tags:
+        - User
+      security:
+        - userAccessToken: []
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '204':
+          description: User deleted successfully
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_access_token:
+                  summary: Invalid access token
+                  value:
+                    code: "401_01_006"
+                    message: "Invalid access token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "403_01_011"
+                message: "User not authorized"
+                timestamp: "1970-01-01T00:00:00Z"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "404_01_001"
+                message: "User not found"
+                timestamp: "1970-01-01T00:00:00Z"
