@@ -196,6 +196,76 @@ func TestAPI_AuthRefresh_Success(t *testing.T) {
 	assert.InDelta(t, time.Now().Unix()+3600, accesstokenClaims.ExpiresAt.Time.Unix(), 5)
 }
 
+func TestAPI_AuthVerify_Success(t *testing.T) {
+	setupAuthConfig("http://localhost:8080")
+	test.SetupLogger()
+	router := test.SetupRouter(RegisterRoutes)
+	terminate := test.SetupDB(t, &User{})
+	defer terminate()
+	db.DB.Create(&User{
+		ID:           1,
+		Email:        "user1@example.com",
+		Picture:      "https://example.com/picture1.jpg",
+		LastLoginSub: &[]string{"mock-sub-1"}[0],
+		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
+		CreatedAt:    time.Unix(1, 0),
+		UpdatedAt:    time.Unix(1, 0),
+	})
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":     "1",
+		"email":   "user@example.com",
+		"picture": "https://example.com/picture.jpg",
+		"iss":     "identity@vera.sninjo.com",
+	}).SignedString([]byte("mock-access-token-secret"))
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("POST", "/auth/verify", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusNoContent, w.Code)
+}
+func TestAPI_AuthVerify_MissingAuthHeader(t *testing.T) {
+	setupAuthConfig("http://localhost:8080")
+	test.SetupLogger()
+	router := test.SetupRouter(RegisterRoutes)
+	terminate := test.SetupDB(t, &User{})
+	defer terminate()
+
+	req, err := http.NewRequest("POST", "/auth/verify", nil)
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+
+	var resp apperror.Response
+	err = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "401_01_008", resp.Code)
+	assert.InDelta(t, time.Now().Unix(), resp.Timestamp.Unix(), 5)
+}
+func TestAPI_AuthVerify_InvalidAccessToken(t *testing.T) {
+	setupAuthConfig("http://localhost:8080")
+	test.SetupLogger()
+	router := test.SetupRouter(RegisterRoutes)
+	terminate := test.SetupDB(t, &User{})
+	defer terminate()
+
+	req, err := http.NewRequest("POST", "/auth/verify", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer invalid-token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+
+	var resp apperror.Response
+	err = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "401_01_006", resp.Code)
+	assert.InDelta(t, time.Now().Unix(), resp.Timestamp.Unix(), 5)
+}
+
 func TestAPI_UsersList_Success(t *testing.T) {
 	setupAuthConfig("http://localhost:8080")
 	test.SetupLogger()

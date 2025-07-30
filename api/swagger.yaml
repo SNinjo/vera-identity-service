@@ -294,6 +294,54 @@ paths:
                     message: "Invalid authorization header"
                     timestamp: "1970-01-01T00:00:00Z"
 
+  /auth/verify:
+    post:
+      summary: Verify access token
+      description: Validate access token and return user information for microservice-to-microservice authentication
+      tags:
+        - User
+      security:
+        - userAccessToken: []
+      responses:
+        '204':
+          description: Token is valid
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+              examples:
+                invalid_access_token:
+                  summary: Invalid access token
+                  value:
+                    code: "401_01_006"
+                    message: "Invalid access token"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_token_issuer:
+                  summary: Invalid token issuer
+                  value:
+                    code: "401_01_007"
+                    message: "Invalid token issuer"
+                    timestamp: "1970-01-01T00:00:00Z"
+                invalid_auth_header:
+                  summary: Invalid authorization header
+                  value:
+                    code: "401_01_008"
+                    message: "Invalid authorization header"
+                    timestamp: "1970-01-01T00:00:00Z"
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: "403_01_011"
+                message: "User not authorized"
+                timestamp: "1970-01-01T00:00:00Z"
+
   /users:
     get:
       summary: List all users

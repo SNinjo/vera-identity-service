@@ -9,12 +9,13 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/auth/callback", callbackHandler)
 	r.POST("/auth/refresh", refreshHandler)
 
-	rg := r.Group("/users")
+	rg := r.Group("/")
 	rg.Use(AuthMiddleware())
 	{
-		rg.GET("", listUsersHandler)
-		rg.POST("", createUserHandler)
-		rg.PATCH("/:id", updateUserHandler)
-		rg.DELETE("/:id", deleteUserHandler)
+		rg.POST("/auth/verify", verifyHandler)
+		rg.GET("/users", listUsersHandler)
+		rg.POST("/users", createUserHandler)
+		rg.PATCH("/users/:id", updateUserHandler)
+		rg.DELETE("/users/:id", deleteUserHandler)
 	}
 }

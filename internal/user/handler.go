@@ -96,6 +96,10 @@ func refreshHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tokenResponse{AccessToken: accessToken})
 }
 
+func verifyHandler(c *gin.Context) {
+	c.Status(http.StatusNoContent)
+}
+
 func listUsersHandler(c *gin.Context) {
 	users, err := getUsers()
 	if err != nil {
