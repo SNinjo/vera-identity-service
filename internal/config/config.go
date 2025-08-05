@@ -14,6 +14,7 @@ type Config struct {
 	Domain      string
 	Port        string
 	DatabaseURL string
+	FrontendURL string
 
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -53,7 +54,8 @@ func Load() *Config {
 		BaseURL:     os.Getenv("BASE_URL"),
 		Domain:      domain,
 		Port:        port,
-		DatabaseURL: os.Getenv("DB_URL"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+		FrontendURL: os.Getenv("FRONTEND_URL"),
 
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),

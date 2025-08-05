@@ -8,6 +8,7 @@ import (
 
 type AuthConfig struct {
 	BaseURL            string
+	FrontendURL        string
 	OAuthClientID      string
 	OAuthClientSecret  string
 	OAuthEndpoint      oauth2.Endpoint

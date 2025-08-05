@@ -62,7 +62,7 @@ func callbackHandler(c *gin.Context) {
 	}
 
 	c.SetCookie("refresh_token", refreshToken, int(authConfig.RefreshTokenTTL.Seconds()), "/", "", true, true)
-	c.JSON(http.StatusOK, tokenResponse{AccessToken: accessToken})
+	c.Redirect(http.StatusFound, authConfig.FrontendURL+"?access_token="+accessToken)
 }
 
 func refreshHandler(c *gin.Context) {

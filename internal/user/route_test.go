@@ -23,6 +23,7 @@ import (
 func setupAuthConfig(oauthURL string) {
 	Init(&AuthConfig{
 		BaseURL:           "http://mock-base-url",
+		FrontendURL:       "http://mock-frontend-url",
 		OAuthClientID:     "mock-client-id",
 		OAuthClientSecret: "mock-client-secret",
 		OAuthEndpoint: oauth2.Endpoint{
@@ -108,14 +109,17 @@ func TestAPI_AuthCallback_Success(t *testing.T) {
 	require.NoError(t, err)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
 
-	var resp tokenResponse
-	err = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.Equal(t, http.StatusFound, w.Code)
+	location := w.Header().Get("Location")
+	u, err := url.Parse(location)
 	require.NoError(t, err)
+	assert.Equal(t, "http://mock-frontend-url", u.Scheme+"://"+u.Host)
+	assert.Empty(t, u.Path)
 
+	accessToken := u.Query().Get("access_token")
 	accesstokenClaims := tokenClaims{}
-	_, err = jwt.ParseWithClaims(resp.AccessToken, &accesstokenClaims, func(token *jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(accessToken, &accesstokenClaims, func(token *jwt.Token) (interface{}, error) {
 		return []byte("mock-access-token-secret"), nil
 	})
 	require.NoError(t, err)

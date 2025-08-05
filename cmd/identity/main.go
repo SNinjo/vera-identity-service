@@ -26,6 +26,7 @@ func main() {
 	cfg := config.Load()
 	user.Init(&user.AuthConfig{
 		BaseURL:            cfg.BaseURL,
+		FrontendURL:        cfg.FrontendURL,
 		OAuthClientID:      cfg.GoogleClientID,
 		OAuthClientSecret:  cfg.GoogleClientSecret,
 		OAuthEndpoint:      google.Endpoint,
