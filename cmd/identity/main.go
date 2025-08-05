@@ -43,6 +43,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.HTTP())
+	r.Use(middleware.CORS([]string{cfg.FrontendURL}))
 	r.StaticFile("/docs/swagger.yaml", "./api/swagger.yaml")
 	r.StaticFile("/docs", "./api/swagger.html")
 	tool.RegisterRoutes(r)

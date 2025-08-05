@@ -1,4 +1,4 @@
-# Vera Identity Service &middot; ![Coverage](https://img.shields.io/badge/Coverage-63%25-yellow)
+# Vera Identity Service &middot; ![Coverage](https://img.shields.io/badge/Coverage-60.4%25-yellow)
 
 A microservice for handling authentication and JWT token management for Users.
 
