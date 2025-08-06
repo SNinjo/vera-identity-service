@@ -22,12 +22,14 @@ type oauthClaims struct {
 	Email   string `json:"email"`
 	Sub     string `json:"sub"`
 	Picture string `json:"picture"`
+	Name    string `json:"name"`
 	jwt.RegisteredClaims
 }
 type oauthResponse struct {
 	Sub     string
 	Email   string
 	Picture string
+	Name    string
 }
 
 func handleOAuthCallback(code string) (*oauthResponse, error) {
@@ -51,6 +53,7 @@ func handleOAuthCallback(code string) (*oauthResponse, error) {
 		Sub:     claims.Sub,
 		Email:   claims.Email,
 		Picture: claims.Picture,
+		Name:    claims.Name,
 	}, nil
 }
 
@@ -65,6 +68,9 @@ func newJWT(user *User, secret string, ttl time.Duration) (string, error) {
 	}
 	if user.Email != "" {
 		claims.Email = user.Email
+	}
+	if user.Name != nil {
+		claims.Name = *user.Name
 	}
 	if user.Picture != "" {
 		claims.Picture = user.Picture

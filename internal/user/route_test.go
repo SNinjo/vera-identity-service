@@ -51,6 +51,7 @@ func setupOAuthServer(t *testing.T, expectedOAuthCode string) *httptest.Server {
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 		payload := base64.RawURLEncoding.EncodeToString([]byte(`{
 			"sub": "1234567890",
+			"name": "Jo Liao",
 			"email": "user@example.com",
 			"picture": "https://example.com/picture.png"
 		}`))
@@ -124,6 +125,7 @@ func TestAPI_AuthCallback_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "1", accesstokenClaims.Subject)
+	assert.Equal(t, "Jo Liao", accesstokenClaims.Name)
 	assert.Equal(t, "user@example.com", accesstokenClaims.Email)
 	assert.Equal(t, "https://example.com/picture.png", accesstokenClaims.Picture)
 	assert.Equal(t, "identity@vera.sninjo.com", accesstokenClaims.Issuer)
@@ -162,6 +164,7 @@ func TestAPI_AuthRefresh_Success(t *testing.T) {
 	db.DB.Create(&User{
 		ID:      1,
 		Email:   "user@example.com",
+		Name:    test.StringPtr("Jo Liao"),
 		Picture: "https://example.com/picture.png",
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -193,6 +196,7 @@ func TestAPI_AuthRefresh_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "1", accesstokenClaims.Subject)
+	assert.Equal(t, "Jo Liao", accesstokenClaims.Name)
 	assert.Equal(t, "user@example.com", accesstokenClaims.Email)
 	assert.Equal(t, "https://example.com/picture.png", accesstokenClaims.Picture)
 	assert.Equal(t, "identity@vera.sninjo.com", accesstokenClaims.Issuer)
@@ -208,6 +212,7 @@ func TestAPI_AuthVerify_Success(t *testing.T) {
 	defer terminate()
 	db.DB.Create(&User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user1@example.com",
 		Picture:      "https://example.com/picture1.jpg",
 		LastLoginSub: &[]string{"mock-sub-1"}[0],
@@ -217,6 +222,7 @@ func TestAPI_AuthVerify_Success(t *testing.T) {
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
+		"name":    "Jo Liao",
 		"email":   "user@example.com",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",
@@ -278,6 +284,7 @@ func TestAPI_UsersList_Success(t *testing.T) {
 	defer terminate()
 	db.DB.Create(&User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao 1"),
 		Email:        "user1@example.com",
 		Picture:      "https://example.com/picture1.jpg",
 		LastLoginSub: &[]string{"mock-sub-1"}[0],
@@ -287,6 +294,7 @@ func TestAPI_UsersList_Success(t *testing.T) {
 	})
 	db.DB.Create(&User{
 		ID:           2,
+		Name:         test.StringPtr("Jo Liao 2"),
 		Email:        "user2@example.com",
 		Picture:      "https://example.com/picture2.jpg",
 		LastLoginSub: &[]string{"mock-sub-2"}[0],
@@ -296,6 +304,7 @@ func TestAPI_UsersList_Success(t *testing.T) {
 	})
 	deleted := &User{
 		ID:           3,
+		Name:         test.StringPtr("Jo Liao 3"),
 		Email:        "user3@example.com",
 		Picture:      "https://example.com/picture3.jpg",
 		LastLoginSub: &[]string{"mock-sub-3"}[0],
@@ -325,12 +334,14 @@ func TestAPI_UsersList_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, userResponses, 2)
 	assert.Equal(t, 1, userResponses[0].ID)
+	assert.Equal(t, "Jo Liao 1", *userResponses[0].Name)
 	assert.Equal(t, "user1@example.com", userResponses[0].Email)
 	assert.Equal(t, "https://example.com/picture1.jpg", userResponses[0].Picture)
 	assert.Equal(t, time.Unix(1, 0), *userResponses[0].LastLoginAt)
 	assert.Equal(t, time.Unix(1, 0), userResponses[0].CreatedAt)
 	assert.Equal(t, time.Unix(1, 0), userResponses[0].UpdatedAt)
 	assert.Equal(t, 2, userResponses[1].ID)
+	assert.Equal(t, "Jo Liao 2", *userResponses[1].Name)
 	assert.Equal(t, "user2@example.com", userResponses[1].Email)
 	assert.Equal(t, "https://example.com/picture2.jpg", userResponses[1].Picture)
 	assert.Equal(t, time.Unix(2, 0), *userResponses[1].LastLoginAt)
@@ -384,6 +395,7 @@ func TestAPI_UsersCreate_Success(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -393,6 +405,7 @@ func TestAPI_UsersCreate_Success(t *testing.T) {
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
+		"name":    "Jo Liao",
 		"email":   "user@example.com",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",
@@ -428,12 +441,14 @@ func TestAPI_UsersCreate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, users, 2)
 	assert.Equal(t, 1, users[0].ID)
+	assert.Equal(t, "Jo Liao", *users[0].Name)
 	assert.Equal(t, "user@example.com", users[0].Email)
 	assert.Equal(t, "https://example.com/picture.jpg", users[0].Picture)
 	assert.Equal(t, time.Unix(1, 0), *users[0].LastLoginAt)
 	assert.Equal(t, time.Unix(1, 0), users[0].CreatedAt)
 	assert.Equal(t, time.Unix(1, 0), users[0].UpdatedAt)
 	assert.Equal(t, 2, users[1].ID)
+	assert.Nil(t, users[1].Name)
 	assert.Equal(t, "newuser@example.com", users[1].Email)
 	assert.Equal(t, "", users[1].Picture)
 	assert.Nil(t, users[1].LastLoginAt)
@@ -486,6 +501,7 @@ func TestAPI_UsersCreate_ErrorEmailFormat(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -495,6 +511,7 @@ func TestAPI_UsersCreate_ErrorEmailFormat(t *testing.T) {
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
+		"name":    "Jo Liao",
 		"email":   "user@example.com",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",
@@ -516,6 +533,7 @@ func TestAPI_UsersUpdate_Success(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -525,6 +543,7 @@ func TestAPI_UsersUpdate_Success(t *testing.T) {
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
+		"name":    "Jo Liao",
 		"email":   "user@example.com",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",
@@ -536,13 +555,13 @@ func TestAPI_UsersUpdate_Success(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	fmt.Println(w.Body.String())
 	require.Equal(t, http.StatusOK, w.Code)
 
 	var user userResponse
 	err = json.Unmarshal(w.Body.Bytes(), &user)
 	require.NoError(t, err)
 	assert.Equal(t, 1, user.ID)
+	assert.Equal(t, "Jo Liao", *user.Name)
 	assert.Equal(t, "newuser@example.com", user.Email)
 	assert.Equal(t, "https://example.com/picture.jpg", user.Picture)
 	assert.Equal(t, time.Unix(1, 0), *user.LastLoginAt)
@@ -561,6 +580,7 @@ func TestAPI_UsersUpdate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, users, 1)
 	assert.Equal(t, 1, users[0].ID)
+	assert.Equal(t, "Jo Liao", *users[0].Name)
 	assert.Equal(t, "newuser@example.com", users[0].Email)
 	assert.Equal(t, "https://example.com/picture.jpg", users[0].Picture)
 	assert.Equal(t, time.Unix(1, 0), *users[0].LastLoginAt)
@@ -613,6 +633,7 @@ func TestAPI_UsersUpdate_ErrorIDFormat(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -672,6 +693,7 @@ func TestAPI_UsersDelete_Success(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -680,6 +702,7 @@ func TestAPI_UsersDelete_Success(t *testing.T) {
 		UpdatedAt:    time.Unix(1, 0),
 	})
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao 2"),
 		Email:        "user2@example.com",
 		Picture:      "https://example.com/picture2.jpg",
 		LastLoginSub: &[]string{"mock-sub2"}[0],
@@ -715,6 +738,7 @@ func TestAPI_UsersDelete_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, users, 1)
 	assert.Equal(t, 1, users[0].ID)
+	assert.Equal(t, "Jo Liao", *users[0].Name)
 	assert.Equal(t, "user@example.com", users[0].Email)
 	assert.Equal(t, "https://example.com/picture.jpg", users[0].Picture)
 	assert.Equal(t, time.Unix(1, 0), *users[0].LastLoginAt)
@@ -767,6 +791,7 @@ func TestAPI_UsersDelete_ErrorIDFormat(t *testing.T) {
 	terminate := test.SetupDB(t, &User{})
 	defer terminate()
 	db.DB.Create(&User{
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -776,6 +801,7 @@ func TestAPI_UsersDelete_ErrorIDFormat(t *testing.T) {
 	})
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
+		"name":    "Jo Liao",
 		"email":   "user@example.com",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",

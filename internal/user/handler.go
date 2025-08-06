@@ -33,6 +33,7 @@ func callbackHandler(c *gin.Context) {
 	now := time.Now()
 	newUser, err := updateUser(user.ID, &User{
 		Email:        resp.Email,
+		Name:         &resp.Name,
 		Picture:      resp.Picture,
 		LastLoginSub: &resp.Sub,
 		LastLoginAt:  &now,
@@ -43,7 +44,7 @@ func callbackHandler(c *gin.Context) {
 	}
 
 	accessToken, err := newJWT(
-		&User{ID: newUser.ID, Email: newUser.Email, Picture: newUser.Picture},
+		&User{ID: newUser.ID, Name: newUser.Name, Email: newUser.Email, Picture: newUser.Picture},
 		authConfig.AccessTokenSecret,
 		authConfig.AccessTokenTTL,
 	)
@@ -84,7 +85,7 @@ func refreshHandler(c *gin.Context) {
 	}
 
 	accessToken, err := newJWT(
-		&User{ID: user.ID, Email: user.Email, Picture: user.Picture},
+		&User{ID: user.ID, Email: user.Email, Name: user.Name, Picture: user.Picture},
 		authConfig.AccessTokenSecret,
 		authConfig.AccessTokenTTL,
 	)

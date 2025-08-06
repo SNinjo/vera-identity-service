@@ -15,7 +15,7 @@ import (
 
 func TestUnit_NewJWT_Normal(t *testing.T) {
 	token, err := newJWT(
-		&User{ID: 1, Email: "user@example.com", Picture: "https://example.com/picture.jpg"},
+		&User{ID: 1, Name: test.StringPtr("Jo Liao"), Email: "user@example.com", Picture: "https://example.com/picture.jpg"},
 		"mock-secret",
 		1*time.Hour,
 	)
@@ -27,6 +27,7 @@ func TestUnit_NewJWT_Normal(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "1", claims["sub"])
+	assert.Equal(t, "Jo Liao", claims["name"])
 	assert.Equal(t, "user@example.com", claims["email"])
 	assert.Equal(t, "https://example.com/picture.jpg", claims["picture"])
 	assert.Equal(t, "identity@vera.sninjo.com", claims["iss"])
@@ -58,6 +59,7 @@ func TestUnit_ParseJWT_Normal(t *testing.T) {
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":     "1",
 		"email":   "user@example.com",
+		"name":    "John Doe",
 		"picture": "https://example.com/picture.jpg",
 		"iss":     "identity@vera.sninjo.com",
 		"iat":     time.Unix(1, 0).Unix(),
@@ -69,6 +71,7 @@ func TestUnit_ParseJWT_Normal(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "1", claims.Subject)
 	assert.Equal(t, "user@example.com", claims.Email)
+	assert.Equal(t, "John Doe", claims.Name)
 	assert.Equal(t, "https://example.com/picture.jpg", claims.Picture)
 	assert.Equal(t, "identity@vera.sninjo.com", claims.Issuer)
 	assert.Equal(t, time.Unix(1, 0), claims.IssuedAt.Time)
@@ -130,6 +133,7 @@ func TestUnit_GetUserByID_Normal(t *testing.T) {
 	defer terminate()
 	db.DB.Create(&User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -142,6 +146,7 @@ func TestUnit_GetUserByID_Normal(t *testing.T) {
 	u, err := getUserByID(1)
 	require.NoError(t, err)
 	assert.Equal(t, 1, u.ID)
+	assert.Equal(t, "Jo Liao", *u.Name)
 	assert.Equal(t, "user@example.com", u.Email)
 	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
 	assert.Equal(t, "mock-sub", *u.LastLoginSub)
@@ -163,6 +168,7 @@ func TestUnit_GetUserByID_Deleted(t *testing.T) {
 	defer terminate()
 	u := &User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -183,6 +189,7 @@ func TestUnit_GetUserByEmail_Normal(t *testing.T) {
 	defer terminate()
 	db.DB.Create(&User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -195,6 +202,7 @@ func TestUnit_GetUserByEmail_Normal(t *testing.T) {
 	u, err := getUserByEmail("user@example.com")
 	require.NoError(t, err)
 	assert.Equal(t, 1, u.ID)
+	assert.Equal(t, "Jo Liao", *u.Name)
 	assert.Equal(t, "user@example.com", u.Email)
 	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
 	assert.Equal(t, "mock-sub", *u.LastLoginSub)
@@ -216,6 +224,7 @@ func TestUnit_GetUserByEmail_Deleted(t *testing.T) {
 	defer terminate()
 	u := &User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao"),
 		Email:        "user@example.com",
 		Picture:      "https://example.com/picture.jpg",
 		LastLoginSub: &[]string{"mock-sub"}[0],
@@ -236,6 +245,7 @@ func TestUnit_GetUsers_Normal(t *testing.T) {
 	defer terminate()
 	db.DB.Create(&User{
 		ID:           1,
+		Name:         test.StringPtr("Jo Liao 1"),
 		Email:        "user1@example.com",
 		Picture:      "https://example.com/picture1.jpg",
 		LastLoginSub: &[]string{"mock-sub-1"}[0],
@@ -246,6 +256,7 @@ func TestUnit_GetUsers_Normal(t *testing.T) {
 	})
 	db.DB.Create(&User{
 		ID:           2,
+		Name:         test.StringPtr("Jo Liao 2"),
 		Email:        "user2@example.com",
 		Picture:      "https://example.com/picture2.jpg",
 		LastLoginSub: &[]string{"mock-sub2"}[0],
@@ -256,6 +267,7 @@ func TestUnit_GetUsers_Normal(t *testing.T) {
 	})
 	db.DB.Create(&User{
 		ID:           3,
+		Name:         test.StringPtr("Jo Liao 3"),
 		Email:        "user3@example.com",
 		Picture:      "https://example.com/picture3.jpg",
 		LastLoginSub: &[]string{"mock-sub3"}[0],
@@ -269,6 +281,7 @@ func TestUnit_GetUsers_Normal(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 3, len(users))
 	assert.Equal(t, 1, users[0].ID)
+	assert.Equal(t, "Jo Liao 1", *users[0].Name)
 	assert.Equal(t, "user1@example.com", users[0].Email)
 	assert.Equal(t, "https://example.com/picture1.jpg", users[0].Picture)
 	assert.Equal(t, "mock-sub-1", *users[0].LastLoginSub)
@@ -277,6 +290,7 @@ func TestUnit_GetUsers_Normal(t *testing.T) {
 	assert.Equal(t, time.Unix(1, 0), users[0].UpdatedAt)
 	assert.Equal(t, gorm.DeletedAt{}, users[0].DeletedAt)
 	assert.Equal(t, 2, users[1].ID)
+	assert.Equal(t, "Jo Liao 2", *users[1].Name)
 	assert.Equal(t, "user2@example.com", users[1].Email)
 	assert.Equal(t, "https://example.com/picture2.jpg", users[1].Picture)
 	assert.Equal(t, "mock-sub2", *users[1].LastLoginSub)

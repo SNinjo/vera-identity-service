@@ -15,6 +15,7 @@ type requestBody struct {
 }
 
 type tokenClaims struct {
+	Name    string `json:"name,omitempty"`
 	Email   string `json:"email,omitempty"`
 	Picture string `json:"picture,omitempty"`
 	jwt.RegisteredClaims
@@ -26,6 +27,7 @@ type tokenResponse struct {
 
 type userResponse struct {
 	ID          int        `json:"id"`
+	Name        *string    `json:"name"`
 	Email       string     `json:"email"`
 	Picture     string     `json:"picture"`
 	LastLoginAt *time.Time `json:"last_login_at"`
@@ -36,6 +38,7 @@ type userResponse struct {
 func newUserResponse(u *User) *userResponse {
 	return &userResponse{
 		ID:          u.ID,
+		Name:        u.Name,
 		Email:       u.Email,
 		Picture:     u.Picture,
 		LastLoginAt: u.LastLoginAt,
