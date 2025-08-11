@@ -48,7 +48,7 @@ Each feature module follows a consistent structure:
 | `routes.go` | Define HTTP endpoints and middleware for the feature |
 | `handler.go` | Process HTTP requests and responses |
 | `service.go` | Contain business logic and orchestration for the feature |
-| `model.go` | Define data structures and database access for the feature |
+| `repository.go` | Define data structures and database access for the feature |
 | `dto.go` | Define data transfer objects for API contracts |
 
 ### 3.3 Naming Conventions
@@ -57,7 +57,7 @@ Naming follows the [Google Go Style Guide](https://google.github.io/styleguide/g
 
 - **Package names** should be short, all lowercase, and without underscores (e.g., `featurea`, not `featureA` or `feature_a`).
 - **Directories and files** are named after features (e.g., `user`), using lowercase and no special characters.
-- **File names** should reflect their role: `routes.go`, `handler.go`, `service.go`, `model.go`, `dto.go`.
+- **File names** should reflect their role: `routes.go`, `handler.go`, `service.go`, `repository.go`, `dto.go`.
 - **Avoid** generic names like `util`, `common`, or `helper`.
 - **Test files** use the `_test.go` suffix.
 - **Initialisms** (like `ID`, `API`) should be capitalized (e.g., `userID`, not `userId`).
@@ -140,36 +140,107 @@ All features import error codes from this centralized location to ensure consist
 
 Unit tests check that individual functions or methods work as intended, in isolation from the rest of the system.
 
-- Each test targets a single function, method, or class.
-- Mock or stub dependencies to isolate the code under test.
-- Place unit tests in the same package as the code, using the `_test.go` suffix.
-- Use clear, descriptive test names.
-- Use assertion libraries like `testify/assert` for clarity.
-- Name tests following the format: `TestUnit_<name>_<scenario>` (e.g., `TestUnit_Add_Success`).
+#### 6.1.1 Test Scenarios
+
+**Happy Path Scenarios:**
+
+- Test normal operation with valid inputs
+- Verify expected outputs and side effects
+- Test with typical data ranges and formats
+
+**Edge Cases:**
+
+- Test boundary conditions (empty strings, null values, max/min values)
+- Test with unusual but valid inputs
+- Test performance with large datasets
+
+**Error Conditions:**
+
+- Test with invalid inputs (malformed data, wrong types)
+- Test error handling and recovery
+- Verify appropriate error messages and codes
+
+#### 6.1.2 Test Structure & Best Practices
+
+- Each test targets a single function, method, or class
+- Mock or stub dependencies to isolate the code under test
+- Place unit tests in the same package as the code, using the `_test.go` suffix
+- Use the Arrange-Act-Assert (AAA) pattern for consistent test structure
+- Use assertion libraries like `testify/assert` for clarity
+- Name tests following the format: `Test<role>_<method>_<scenario>` (e.g., `TestService_Add_Success`)
+- Fast execution (< 100ms per test) with no external dependencies
+- Use table-driven tests for multiple input scenarios
 
 ### 6.2 API Testing
 
-API tests check that HTTP endpoints behave as expected for both valid and invalid requests.
+API tests verify that HTTP endpoints behave as expected for both valid and invalid requests.
 
-#### 6.2.1 Organization & Naming
+#### 6.2.1 Test Focus
 
-- Group tests by endpoint, usually in their own test file.
-- Each test covers a specific scenario (success, failure, edge case).
-- Name tests following the format: `TestAPI_<name>_<scenario>` (e.g., `TestAPI_Login_Success`).
+Primary Focus: Happy Path Scenarios
 
-#### 6.2.2 Assertions & Best Practices
+- Test complete user journeys and workflows
+- Verify correct request/response formats
+- Test authentication and authorization flows
+- Validate business logic integration
 
-- Always check the HTTP status code.
-- For error responses, assert the error code (HTTP status and/or `code` field in the response body). Checking the error message is optional.
-- Validate the response body when relevant.
-- Use a consistent structure: setup, execute, assert.
-- Use assertion libraries like `testify/assert` for clarity.
+Secondary Focus: Critical Error Cases
 
-#### 6.2.3 Mocking & External Services
+- Test common error scenarios (validation failures, not found)
+- Verify error response formats and codes
+- Test rate limiting and security measures
 
-- Use tools like testcontainers-go to run real or mock services in containers for tests that need external dependencies.
-- Set up test databases and seed data to verify authentication, CRUD operations, and error scenarios.
-- Clean up containers or mocks after tests.
+#### 6.2.2 Organization & Naming
+
+- Group tests by endpoint, usually in their own test file
+- Each test covers a specific scenario (success, failure, edge case)
+- Name tests following the format: `TestAPI_<name>_<scenario>` (e.g., `TestAPI_GetUser_Success`)
+- Use descriptive test names that explain the business scenario
+
+#### 6.2.3 Assertions & Best Practices
+
+- Always check the HTTP status code
+- For error responses, assert the error code (HTTP status and/or `code` field in the response body)
+- Validate the response body structure and content when relevant
+- Use the Arrange-Act-Assert (AAA) pattern for consistent test structure
+- Use assertion libraries like `testify/assert` for clarity
+- Test response headers when relevant (content-type, authorization, etc.)
+
+#### 6.2.4 Mocking & External Services
+
+- Use tools like testcontainers-go to run real or mock services in containers
+- Set up test databases and seed data to verify authentication, CRUD operations, and error scenarios
+- Clean up containers or mocks after tests
+- Use in-memory databases for faster test execution when possible
+
+### 6.4 Test Coverage Requirements
+
+#### 6.4.1 Unit Tests
+
+- **Minimum coverage**: 80% of business logic code
+- **Critical paths**: 100% coverage for authentication, authorization, and data validation
+- **Focus areas**: Service layer, utility functions, data transformations
+
+#### 6.4.2 API Tests
+
+- **Coverage**: All public endpoints with happy path and critical error scenarios
+- **Authentication**: All protected endpoints with valid and invalid tokens
+- **Validation**: All input validation rules and error responses
+
+### 6.5 Continuous Integration
+
+#### 6.5.1 Test Execution
+
+- Run unit tests on every commit (fast feedback)
+- Run API tests on pull requests (medium feedback)
+- Fail builds on test failures with clear error reporting
+
+#### 6.5.2 Test Environment
+
+- Maintain dedicated test environments for different test types
+- Use containerization for consistent test environments
+- Implement proper cleanup and resource management
+- Monitor test execution time and optimize slow tests
 
 ## 7. Deployment & Operations
 

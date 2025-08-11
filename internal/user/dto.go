@@ -1,48 +1,38 @@
 package user
 
-import (
-	"time"
+import "time"
 
-	"github.com/golang-jwt/jwt/v5"
-)
-
-type requestUri struct {
+type RequestUri struct {
 	ID int `uri:"id" binding:"required,min=1"`
 }
 
-type requestBody struct {
-	Email string `json:"email" binding:"required,email,max=255"`
+type RequestBody struct {
+	Email string `json:"email" binding:"email,max=255"`
 }
 
-type tokenClaims struct {
-	Name    string `json:"name,omitempty"`
-	Email   string `json:"email,omitempty"`
-	Picture string `json:"picture,omitempty"`
-	jwt.RegisteredClaims
+type UserResponse struct {
+	ID          int     `json:"id"`
+	Name        *string `json:"name"`
+	Email       string  `json:"email"`
+	Picture     *string `json:"picture"`
+	LastLoginAt *string `json:"last_login_at"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
-type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-}
-
-type userResponse struct {
-	ID          int        `json:"id"`
-	Name        *string    `json:"name"`
-	Email       string     `json:"email"`
-	Picture     string     `json:"picture"`
-	LastLoginAt *time.Time `json:"last_login_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
-func newUserResponse(u *User) *userResponse {
-	return &userResponse{
+func newUserResponse(u *User) *UserResponse {
+	var lastLoginAt *string
+	if u.LastLoginAt != nil {
+		t := u.LastLoginAt.Format(time.RFC3339)
+		lastLoginAt = &t
+	}
+	return &UserResponse{
 		ID:          u.ID,
 		Name:        u.Name,
 		Email:       u.Email,
 		Picture:     u.Picture,
-		LastLoginAt: u.LastLoginAt,
-		CreatedAt:   u.CreatedAt,
-		UpdatedAt:   u.UpdatedAt,
+		LastLoginAt: lastLoginAt,
+		CreatedAt:   u.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   u.UpdatedAt.Format(time.RFC3339),
 	}
 }

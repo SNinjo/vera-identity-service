@@ -1,17 +1,19 @@
 package db
 
 import (
+	"vera-identity-service/internal/config"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
-func Init(dsn string) (*gorm.DB, error) {
-	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+func NewDatabase(config *config.Config) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(config.DatabaseURL), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		return nil, err
 	}
-	return DB, nil
+	return db, nil
 }

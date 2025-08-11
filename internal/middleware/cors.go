@@ -2,16 +2,18 @@ package middleware
 
 import (
 	"net/http"
-	"slices"
+	"vera-identity-service/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
 
-func CORS(allowedOrigin []string) gin.HandlerFunc {
+type CORSMiddleware gin.HandlerFunc
+
+func NewCORSMiddleware(config *config.Config) CORSMiddleware {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 
-		if slices.Contains(allowedOrigin, origin) {
+		if config.SiteURL == origin {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token")

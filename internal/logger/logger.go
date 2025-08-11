@@ -4,8 +4,10 @@ import (
 	"go.uber.org/zap"
 )
 
-var Logger *zap.Logger
-
-func Init(logger *zap.Logger) {
-	Logger = logger
+func NewLogger() (*zap.Logger, error) {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	return logger, nil
 }

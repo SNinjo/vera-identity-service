@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Vera Identity Service API</title>
+    <title>Loading...</title>
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
   </head>
   <body>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
     <script>
-      SwaggerUIBundle({
-        url: "/docs/swagger.yaml",
+      const ui = SwaggerUIBundle({
+        url: "/docs/swagger.yaml?v=" + new Date().getTime(), // Add timestamp to prevent caching
         dom_id: '#swagger-ui',
+        onComplete: function() {
+          const spec = ui.getSystem().specSelectors.specJson().toJS();
+          if (spec && spec.info && spec.info.title) {
+            document.title = spec.info.title;
+          }
+        }
       });
     </script>
   </body>

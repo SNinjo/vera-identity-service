@@ -8,15 +8,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func checkHealthHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+type Handler struct{}
+
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
-func getUnixTimestampHandler(c *gin.Context) {
+func (h *Handler) getUnixTimestampHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, time.Now().Unix())
 }
 
-func generateJWTHandler(c *gin.Context) {
+func (h *Handler) generateJWTHandler(c *gin.Context) {
 	var req GenerateJWTRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body: " + err.Error()})

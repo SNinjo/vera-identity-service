@@ -1,21 +1,18 @@
 package user
 
 import (
+	"vera-identity-service/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(r *gin.Engine) {
-	r.GET("/auth/login", loginHandler)
-	r.GET("/auth/callback", callbackHandler)
-	r.POST("/auth/refresh", refreshHandler)
-
-	rg := r.Group("/")
-	rg.Use(AuthMiddleware())
+func RegisterRoutes(r *gin.Engine, handler *Handler, authMiddleware middleware.AuthMiddleware) {
+	g := r.Group("/users")
+	g.Use(gin.HandlerFunc(authMiddleware))
 	{
-		rg.POST("/auth/verify", verifyHandler)
-		rg.GET("/users", listUsersHandler)
-		rg.POST("/users", createUserHandler)
-		rg.PATCH("/users/:id", updateUserHandler)
-		rg.DELETE("/users/:id", deleteUserHandler)
+		g.GET("", handler.GetUsers)
+		g.POST("", handler.CreateUser)
+		g.PATCH("/:id", handler.UpdateUser)
+		g.DELETE("/:id", handler.DeleteUser)
 	}
 }

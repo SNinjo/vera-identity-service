@@ -1,152 +1,116 @@
 package user
 
 import (
-	"context"
 	"strconv"
 	"time"
 
 	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/db"
-
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/oauth2"
-	"gorm.io/gorm"
 )
 
-func getOAuthLoginURL() string {
-	// TODO: generate and store CSRF state securely
-	return oauthConfig.AuthCodeURL("state", oauth2.AccessTypeOffline)
+type Service interface {
+	GetUserByID(id int) (*User, error)
+	GetUserByEmail(email string) (*User, error)
+	GetUsers() ([]User, error)
+	CreateUser(email string) error
+	UpdateUser(id int, email string) error
+	DeleteUser(id int) error
+	RecordUserLogin(id int, name, picture, loginSub string) error
 }
 
-type oauthClaims struct {
-	Email   string `json:"email"`
-	Sub     string `json:"sub"`
-	Picture string `json:"picture"`
-	Name    string `json:"name"`
-	jwt.RegisteredClaims
-}
-type oauthResponse struct {
-	Sub     string
-	Email   string
-	Picture string
-	Name    string
+type service struct {
+	repo Repository
 }
 
-func handleOAuthCallback(code string) (*oauthResponse, error) {
-	oauthToken, err := oauthConfig.Exchange(context.Background(), code)
+func NewService(repo Repository) Service {
+	return &service{repo: repo}
+}
+
+func (s *service) validateEmailUniqueness(email string, excludeID *int) error {
+	existingUser, err := s.repo.GetByEmail(email)
 	if err != nil {
-		return nil, apperror.New(apperror.CodeInvalidOAuthCode, "failed to exchange OAuth code | code: "+code)
+		return err
 	}
-	idToken, _ := oauthToken.Extra("id_token").(string)
-	claims := &oauthClaims{}
-	_, _, err = new(jwt.Parser).ParseUnverified(idToken, claims)
+	if existingUser != nil && (excludeID == nil || existingUser.ID != *excludeID) {
+		return apperror.New(apperror.CodeUserEmailInUse, "user email already in use | email: "+email)
+	}
+	return nil
+}
+
+func (s *service) GetUserByID(id int) (*User, error) {
+	return s.repo.GetByID(id)
+}
+
+func (s *service) GetUserByEmail(email string) (*User, error) {
+	return s.repo.GetByEmail(email)
+}
+
+func (s *service) GetUsers() ([]User, error) {
+	return s.repo.GetAll()
+}
+
+func (s *service) CreateUser(email string) error {
+	if err := s.validateEmailUniqueness(email, nil); err != nil {
+		return err
+	}
+
+	user := &User{Email: email}
+	if err := s.repo.Create(user); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *service) UpdateUser(id int, email string) error {
+	if err := s.validateEmailUniqueness(email, &id); err != nil {
+		return err
+	}
+
+	user, err := s.repo.GetByID(id)
 	if err != nil {
-		return nil, apperror.New(apperror.CodeInvalidOAuthIdToken, "failed to parse id_token | id_token: "+idToken)
+		return err
 	}
-	if claims.Sub == "" || claims.Email == "" || claims.Picture == "" {
-		return nil, apperror.New(
-			apperror.CodeMissingUserInfo,
-			"missing sub, email, or picture | sub: "+claims.Sub+" | email: "+claims.Email+" | picture: "+claims.Picture,
-		)
+	if user == nil {
+		return apperror.New(apperror.CodeUserNotFound, "user not found | id: "+strconv.Itoa(id))
 	}
-	return &oauthResponse{
-		Sub:     claims.Sub,
-		Email:   claims.Email,
-		Picture: claims.Picture,
-		Name:    claims.Name,
-	}, nil
+
+	if email != "" {
+		user.Email = email
+	}
+	if err := s.repo.Update(user); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func newJWT(user *User, secret string, ttl time.Duration) (string, error) {
-	claims := tokenClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   strconv.Itoa(user.ID),
-			Issuer:    "identity@vera.sninjo.com",
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	if user.Email != "" {
-		claims.Email = user.Email
-	}
-	if user.Name != nil {
-		claims.Name = *user.Name
-	}
-	if user.Picture != "" {
-		claims.Picture = user.Picture
-	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
-}
-
-func parseJWT(token string, secret string) (*tokenClaims, error) {
-	claims := &tokenClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
-	})
+func (s *service) DeleteUser(id int) error {
+	user, err := s.repo.GetByID(id)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if user == nil {
+		return apperror.New(apperror.CodeUserNotFound, "user not found | id: "+strconv.Itoa(id))
 	}
 
-	if claims.Issuer != "identity@vera.sninjo.com" {
-		return nil, apperror.New(apperror.CodeInvalidTokenIssuer, "invalid token issuer | token: "+token)
-	}
-
-	return claims, nil
+	return s.repo.SoftDelete(id)
 }
 
-func getUserByID(id int) (*User, error) {
-	var u User
-	err := db.DB.Where("id = ?", id).First(&u).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
+func (s *service) RecordUserLogin(id int, name, picture, loginSub string) error {
+	user, err := s.repo.GetByID(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &u, nil
-}
-
-func getUserByEmail(email string) (*User, error) {
-	var u User
-	err := db.DB.Where("email = ?", email).First(&u).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func getUsers() ([]User, error) {
-	var users []User
-	err := db.DB.Find(&users).Error
-	if err != nil {
-		return nil, err
-	}
-	return users, nil
-}
-
-func createUser(user *User) error {
-	return db.DB.Create(user).Error
-}
-
-func updateUser(id int, updates *User) (*User, error) {
-	existingUser, err := getUserByID(id)
-	if err != nil {
-		return nil, err
-	} else if existingUser == nil {
-		return nil, apperror.New(apperror.CodeUserNotFound, "user not found | id: "+strconv.Itoa(id))
+	if user == nil {
+		return apperror.New(apperror.CodeUserNotFound, "user not found | id: "+strconv.Itoa(id))
 	}
 
-	err = db.DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error
-	if err != nil {
-		return nil, err
+	user.Name = &name
+	user.Picture = &picture
+	user.LastLoginSub = &loginSub
+	now := time.Now()
+	user.LastLoginAt = &now
+	if err := s.repo.Update(user); err != nil {
+		return err
 	}
-
-	return getUserByID(id)
-}
-
-func deleteUser(id int) error {
-	return db.DB.Delete(&User{ID: id}).Error
+	return nil
 }

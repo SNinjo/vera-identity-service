@@ -1,11 +1,12 @@
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
+  name VARCHAR(255),
   email VARCHAR(255) NOT NULL,
   picture VARCHAR(255),
   last_login_sub VARCHAR(255),
   last_login_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
   deleted_at TIMESTAMPTZ
 );
 

@@ -1,13 +1,22 @@
-.PHONY: start dev migrate-create migrate-up migrate-down
+.PHONY: wire dev build prod test test-cov test-cov-html access-db migrate-create migrate-up migrate-down migrate-force insert-user-to-db
 
 SHELL := /bin/bash
 ENV := source .env &&
 
-start:
-	go run main.go
+wire:
+	go run github.com/google/wire/cmd/wire ./internal/app/
 
 dev:
-	reflex -s -r '(\.go$$|^\.env$$)' -- sh -c 'go run cmd/identity/main.go'
+	reflex -s -r '(\.go$$|^\.env$$)' -R '(_gen\.go$$)' -- sh -c 'make wire && go run ./cmd/...'
+
+build:
+	mkdir -p bin
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o bin/main ./cmd/...
+	chmod +x bin/main
+
+prod:
+	make build
+	$(ENV) GIN_MODE=release bin/main
 
 path ?= ./...
 test:
@@ -31,9 +40,6 @@ test-cov-html:
 access-db:
 	$(ENV) psql "$$DATABASE_URL"
 
-insert-user-to-db:
-	$(ENV) psql "$$DATABASE_URL" -c "INSERT INTO users (email) VALUES ('$(email)');"
-
 migrate-create:
 	migrate create -ext sql -dir migrations -seq $(name)
 
@@ -45,3 +51,6 @@ migrate-down:
 
 migrate-force:
 	$(ENV) migrate -path migrations -database "$$DATABASE_URL" force $(version)
+
+insert-user-to-db:
+	$(ENV) psql "$$DATABASE_URL" -c "INSERT INTO users (email) VALUES ('$(email)');"

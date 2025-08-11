@@ -5,13 +5,15 @@ import (
 	"io"
 	"time"
 	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/logger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-func logRequest(c *gin.Context, f *[]zap.Field) {
+type HTTPMiddleware gin.HandlerFunc
+
+func logRequest(c *gin.Context, logger *zap.Logger, requestID string) {
 	method := c.Request.Method
 	path := c.Request.URL.Path
 	query := c.Request.URL.RawQuery
@@ -26,21 +28,25 @@ func logRequest(c *gin.Context, f *[]zap.Field) {
 		bodyBytes, _ = io.ReadAll(c.Request.Body)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
-	*f = append(*f,
+	fields := []zap.Field{
+		zap.String("request_id", requestID),
 		zap.String("method", method),
 		zap.String("path", path),
 		zap.String("query", query),
-		zap.String("request_body", string(bodyBytes)),
+		zap.String("body", string(bodyBytes)),
 		zap.Strings("cookies", cookieStrs),
 		zap.String("auth_header", authHeader),
-	)
+	}
+	logger.Info("request started", fields...)
 }
 
-func HTTP() gin.HandlerFunc {
+func NewHTTPMiddleware(logger *zap.Logger) HTTPMiddleware {
 	return func(c *gin.Context) {
 		start := time.Now()
+		requestID := uuid.New().String()
+		logRequest(c, logger, requestID)
+
 		c.Next()
-		duration := time.Since(start)
 
 		err := c.Errors.Last()
 		var appErr *apperror.AppError
@@ -49,12 +55,12 @@ func HTTP() gin.HandlerFunc {
 			c.JSON(appErr.Status, appErr.Response)
 		}
 
-		fields := []zap.Field{
+		f := []zap.Field{
+			zap.String("request_id", requestID),
 			zap.Int("status", c.Writer.Status()),
-			zap.Int64("duration_ms", duration.Milliseconds()),
+			zap.Int64("duration_ms", time.Since(start).Milliseconds()),
 			zap.Error(appErr),
 		}
-		logRequest(c, &fields)
-		logger.Logger.Info("request completed", fields...)
+		logger.Info("request completed", f...)
 	}
 }

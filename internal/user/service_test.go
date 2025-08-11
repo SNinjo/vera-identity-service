@@ -3,497 +3,526 @@ package user
 import (
 	"testing"
 	"time"
-	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/db"
-	"vera-identity-service/internal/test"
 
-	"github.com/golang-jwt/jwt/v5"
+	"vera-identity-service/internal/apperror"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
-func TestUnit_NewJWT_Normal(t *testing.T) {
-	token, err := newJWT(
-		&User{ID: 1, Name: test.StringPtr("Jo Liao"), Email: "user@example.com", Picture: "https://example.com/picture.jpg"},
-		"mock-secret",
-		1*time.Hour,
-	)
-	require.NoError(t, err)
-
-	claims := jwt.MapClaims{}
-	_, err = jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte("mock-secret"), nil
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "1", claims["sub"])
-	assert.Equal(t, "Jo Liao", claims["name"])
-	assert.Equal(t, "user@example.com", claims["email"])
-	assert.Equal(t, "https://example.com/picture.jpg", claims["picture"])
-	assert.Equal(t, "identity@vera.sninjo.com", claims["iss"])
-	assert.InDelta(t, time.Now().Unix(), claims["iat"].(float64), 5)
-	assert.InDelta(t, time.Now().Unix()+3600, claims["exp"].(float64), 5)
-}
-func TestUnit_NewJWT_OnlyID(t *testing.T) {
-	token, err := newJWT(
-		&User{ID: 1},
-		"mock-secret",
-		1*time.Hour,
-	)
-	require.NoError(t, err)
-
-	claims := jwt.MapClaims{}
-	_, err = jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return []byte("mock-secret"), nil
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "1", claims["sub"])
-	assert.Nil(t, claims["email"])
-	assert.Nil(t, claims["picture"])
-	assert.Equal(t, "identity@vera.sninjo.com", claims["iss"])
-	assert.InDelta(t, time.Now().Unix(), claims["iat"].(float64), 5)
-	assert.InDelta(t, time.Now().Unix()+3600, claims["exp"].(float64), 5)
+type MockRepository struct {
+	mock.Mock
 }
 
-func TestUnit_ParseJWT_Normal(t *testing.T) {
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     "1",
-		"email":   "user@example.com",
-		"name":    "John Doe",
-		"picture": "https://example.com/picture.jpg",
-		"iss":     "identity@vera.sninjo.com",
-		"iat":     time.Unix(1, 0).Unix(),
-		"exp":     time.Unix(10000000000, 0).Unix(),
-	}).SignedString([]byte("mock-secret"))
-	require.NoError(t, err)
-
-	claims, err := parseJWT(token, "mock-secret")
-	require.NoError(t, err)
-	assert.Equal(t, "1", claims.Subject)
-	assert.Equal(t, "user@example.com", claims.Email)
-	assert.Equal(t, "John Doe", claims.Name)
-	assert.Equal(t, "https://example.com/picture.jpg", claims.Picture)
-	assert.Equal(t, "identity@vera.sninjo.com", claims.Issuer)
-	assert.Equal(t, time.Unix(1, 0), claims.IssuedAt.Time)
-	assert.Equal(t, time.Unix(10000000000, 0), claims.ExpiresAt.Time)
+func (m *MockRepository) Create(user *User) error {
+	args := m.Called(user)
+	return args.Error(0)
 }
-func TestUnit_ParseJWT_InvalidToken(t *testing.T) {
-	claims, err := parseJWT("invalid-token", "only-for-test")
-	assert.Error(t, err)
-	assert.Nil(t, claims)
-}
-func TestUnit_ParseJWT_InvalidSecret(t *testing.T) {
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     "1",
-		"email":   "user@example.com",
-		"picture": "https://example.com/picture.jpg",
-		"iss":     "identity@vera.sninjo.com",
-		"iat":     time.Unix(1, 0).Unix(),
-		"exp":     time.Unix(10000000000, 0).Unix(),
-	}).SignedString([]byte("mock-secret"))
-	require.NoError(t, err)
-
-	claims, err := parseJWT(token, "invalid-secret")
-	assert.Error(t, err)
-	assert.Nil(t, claims)
-}
-func TestUnit_ParseJWT_InvalidIssuer(t *testing.T) {
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     "1",
-		"email":   "user@example.com",
-		"picture": "https://example.com/picture.jpg",
-		"iss":     "invalid-issuer",
-		"iat":     time.Unix(1, 0).Unix(),
-		"exp":     time.Unix(10000000000, 0).Unix(),
-	}).SignedString([]byte("mock-secret"))
-	require.NoError(t, err)
-
-	claims, err := parseJWT(token, "mock-secret")
-	assert.Equal(t, apperror.CodeInvalidTokenIssuer, err.(*apperror.AppError).Code)
-	assert.Nil(t, claims)
-}
-func TestUnit_ParseJWT_ExpiredToken(t *testing.T) {
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":     "1",
-		"email":   "user@example.com",
-		"picture": "https://example.com/picture.jpg",
-		"iss":     "identity@vera.sninjo.com",
-		"iat":     time.Unix(1, 0).Unix(),
-		"exp":     time.Unix(1, 0).Unix(),
-	}).SignedString([]byte("mock-secret"))
-	require.NoError(t, err)
-
-	claims, err := parseJWT(token, "mock-secret")
-	assert.Error(t, err)
-	assert.Nil(t, claims)
-}
-
-func TestUnit_GetUserByID_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Name:         test.StringPtr("Jo Liao"),
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
-
-	u, err := getUserByID(1)
-	require.NoError(t, err)
-	assert.Equal(t, 1, u.ID)
-	assert.Equal(t, "Jo Liao", *u.Name)
-	assert.Equal(t, "user@example.com", u.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
-	assert.Equal(t, "mock-sub", *u.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *u.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), u.CreatedAt)
-	assert.Equal(t, time.Unix(1, 0), u.UpdatedAt)
-	assert.Equal(t, gorm.DeletedAt{}, u.DeletedAt)
-}
-func TestUnit_GetUserByID_NotFound(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-
-	u, err := getUserByID(1)
-	assert.NoError(t, err)
-	assert.Nil(t, u)
-}
-func TestUnit_GetUserByID_Deleted(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	u := &User{
-		ID:           1,
-		Name:         test.StringPtr("Jo Liao"),
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
+func (m *MockRepository) GetByID(id int) (*User, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	db.DB.Create(u)
-	db.DB.Delete(u)
-
-	u, err := getUserByID(1)
-	assert.NoError(t, err)
-	assert.Nil(t, u)
+	return args.Get(0).(*User), args.Error(1)
 }
-
-func TestUnit_GetUserByEmail_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Name:         test.StringPtr("Jo Liao"),
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
-
-	u, err := getUserByEmail("user@example.com")
-	require.NoError(t, err)
-	assert.Equal(t, 1, u.ID)
-	assert.Equal(t, "Jo Liao", *u.Name)
-	assert.Equal(t, "user@example.com", u.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
-	assert.Equal(t, "mock-sub", *u.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *u.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), u.CreatedAt)
-	assert.Equal(t, time.Unix(1, 0), u.UpdatedAt)
-	assert.Equal(t, gorm.DeletedAt{}, u.DeletedAt)
-}
-func TestUnit_GetUserByEmail_NotFound(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-
-	u, err := getUserByEmail("user@example.com")
-	assert.NoError(t, err)
-	assert.Nil(t, u)
-}
-func TestUnit_GetUserByEmail_Deleted(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	u := &User{
-		ID:           1,
-		Name:         test.StringPtr("Jo Liao"),
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
+func (m *MockRepository) GetByEmail(email string) (*User, error) {
+	args := m.Called(email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	db.DB.Create(u)
-	db.DB.Delete(u)
-
-	u, err := getUserByEmail("user@example.com")
-	assert.NoError(t, err)
-	assert.Nil(t, u)
+	return args.Get(0).(*User), args.Error(1)
 }
-
-func TestUnit_GetUsers_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Name:         test.StringPtr("Jo Liao 1"),
-		Email:        "user1@example.com",
-		Picture:      "https://example.com/picture1.jpg",
-		LastLoginSub: &[]string{"mock-sub-1"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
-	db.DB.Create(&User{
-		ID:           2,
-		Name:         test.StringPtr("Jo Liao 2"),
-		Email:        "user2@example.com",
-		Picture:      "https://example.com/picture2.jpg",
-		LastLoginSub: &[]string{"mock-sub2"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(2, 0)}[0],
-		CreatedAt:    time.Unix(2, 0),
-		UpdatedAt:    time.Unix(2, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
-	db.DB.Create(&User{
-		ID:           3,
-		Name:         test.StringPtr("Jo Liao 3"),
-		Email:        "user3@example.com",
-		Picture:      "https://example.com/picture3.jpg",
-		LastLoginSub: &[]string{"mock-sub3"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(3, 0)}[0],
-		CreatedAt:    time.Unix(3, 0),
-		UpdatedAt:    time.Unix(3, 0),
-		DeletedAt:    gorm.DeletedAt{Time: time.Unix(3, 0)},
-	})
-
-	users, err := getUsers()
-	require.NoError(t, err)
-	assert.Equal(t, 3, len(users))
-	assert.Equal(t, 1, users[0].ID)
-	assert.Equal(t, "Jo Liao 1", *users[0].Name)
-	assert.Equal(t, "user1@example.com", users[0].Email)
-	assert.Equal(t, "https://example.com/picture1.jpg", users[0].Picture)
-	assert.Equal(t, "mock-sub-1", *users[0].LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *users[0].LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), users[0].CreatedAt)
-	assert.Equal(t, time.Unix(1, 0), users[0].UpdatedAt)
-	assert.Equal(t, gorm.DeletedAt{}, users[0].DeletedAt)
-	assert.Equal(t, 2, users[1].ID)
-	assert.Equal(t, "Jo Liao 2", *users[1].Name)
-	assert.Equal(t, "user2@example.com", users[1].Email)
-	assert.Equal(t, "https://example.com/picture2.jpg", users[1].Picture)
-	assert.Equal(t, "mock-sub2", *users[1].LastLoginSub)
-	assert.Equal(t, time.Unix(2, 0), *users[1].LastLoginAt)
-	assert.Equal(t, time.Unix(2, 0), users[1].CreatedAt)
-	assert.Equal(t, time.Unix(2, 0), users[1].UpdatedAt)
-	assert.Equal(t, gorm.DeletedAt{}, users[1].DeletedAt)
-}
-
-func TestUnit_CreateUser_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-
-	user := &User{
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
+func (m *MockRepository) GetAll() ([]User, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	err := createUser(user)
-	require.NoError(t, err)
-	assert.Equal(t, 1, user.ID)
-	assert.Equal(t, "user@example.com", user.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", user.Picture)
-	assert.Equal(t, "mock-sub", *user.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *user.LastLoginAt)
-	assert.InDelta(t, time.Now().Unix(), user.CreatedAt.Unix(), 5)
-	assert.InDelta(t, time.Now().Unix(), user.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, user.DeletedAt)
-
-	var u User
-	db.DB.Where("email = ?", "user@example.com").First(&u)
-	assert.Equal(t, 1, u.ID)
-	assert.Equal(t, "user@example.com", u.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
-	assert.Equal(t, "mock-sub", *u.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *u.LastLoginAt)
-	assert.InDelta(t, time.Now().Unix(), u.CreatedAt.Unix(), 5)
-	assert.InDelta(t, time.Now().Unix(), u.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, u.DeletedAt)
+	return args.Get(0).([]User), args.Error(1)
+}
+func (m *MockRepository) Update(user *User) error {
+	args := m.Called(user)
+	return args.Error(0)
+}
+func (m *MockRepository) SoftDelete(id int) error {
+	args := m.Called(id)
+	return args.Error(0)
 }
 
-func TestUnit_UpdateUser_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
+func TestService_NewService_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
 
-	newUser, err := updateUser(1, &User{
-		Email:        "user2@example.com",
-		Picture:      "https://example.com/picture2.jpg",
-		LastLoginSub: &[]string{"mock-sub2"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(2, 0)}[0],
-	})
-	require.NoError(t, err)
-	assert.Equal(t, 1, newUser.ID)
-	assert.Equal(t, "user2@example.com", newUser.Email)
-	assert.Equal(t, "https://example.com/picture2.jpg", newUser.Picture)
-	assert.Equal(t, "mock-sub2", *newUser.LastLoginSub)
-	assert.Equal(t, time.Unix(2, 0), *newUser.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), newUser.CreatedAt)
-	assert.InDelta(t, time.Now().Unix(), newUser.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, newUser.DeletedAt)
+	// Act
+	s := NewService(mockRepo)
 
-	var u User
-	db.DB.Where("id = ?", 1).First(&u)
-	assert.Equal(t, 1, u.ID)
-	assert.Equal(t, "user2@example.com", u.Email)
-	assert.Equal(t, "https://example.com/picture2.jpg", u.Picture)
-	assert.Equal(t, "mock-sub2", *u.LastLoginSub)
-	assert.Equal(t, time.Unix(2, 0), *u.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), u.CreatedAt)
-	assert.InDelta(t, time.Now().Unix(), u.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, u.DeletedAt)
+	// Assert
+	assert.IsType(t, &service{}, s)
+	assert.Equal(t, mockRepo, s.(*service).repo)
 }
-func TestUnit_UpdateUser_OnlyEmail(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-		DeletedAt:    gorm.DeletedAt{},
-	})
 
-	newUser, err := updateUser(1, &User{
-		Email: "user2@example.com",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, 1, newUser.ID)
-	assert.Equal(t, "user2@example.com", newUser.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", newUser.Picture)
-	assert.Equal(t, "mock-sub", *newUser.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *newUser.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), newUser.CreatedAt)
-	assert.InDelta(t, time.Now().Unix(), newUser.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, newUser.DeletedAt)
+func TestService_validateEmailUniqueness_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
 
-	var u User
-	db.DB.Where("id = ?", 1).First(&u)
-	assert.Equal(t, 1, u.ID)
-	assert.Equal(t, "user2@example.com", u.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", u.Picture)
-	assert.Equal(t, "mock-sub", *u.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *u.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), u.CreatedAt)
-	assert.InDelta(t, time.Now().Unix(), u.UpdatedAt.Unix(), 5)
-	assert.Equal(t, gorm.DeletedAt{}, u.DeletedAt)
+	email := "email@example.com"
+
+	mockRepo.On("GetByEmail", email).Return(nil, nil)
+
+	// Act
+	err := service.validateEmailUniqueness(email, nil)
+
+	// Assert
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
 }
-func TestUnit_UpdateUser_NotFound(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
+func TestService_validateEmailUniqueness_ExcludeID(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
 
-	newUser, err := updateUser(1, &User{
-		Email:        "user2@example.com",
-		Picture:      "https://example.com/picture2.jpg",
-		LastLoginSub: &[]string{"mock-sub2"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(2, 0)}[0],
-	})
-	assert.Error(t, err)
+	user := &User{ID: 1, Email: "email@example.com"}
+
+	mockRepo.On("GetByEmail", user.Email).Return(user, nil)
+
+	// Act
+	err := service.validateEmailUniqueness(user.Email, &user.ID)
+
+	// Assert
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_validateEmailUniqueness_EmailAlreadyExists(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1, Email: "email@example.com"}
+
+	mockRepo.On("GetByEmail", user.Email).Return(user, nil)
+
+	// Act
+	err := service.validateEmailUniqueness(user.Email, nil)
+
+	// Assert
+	assert.Equal(t, apperror.CodeUserEmailInUse, err.(*apperror.AppError).Code)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_validateEmailUniqueness_RepositoryError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	email := "email@example.com"
+
+	mockRepo.On("GetByEmail", email).Return(nil, assert.AnError)
+
+	// Act
+	err := service.validateEmailUniqueness(email, nil)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_GetUserByID_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1}
+
+	mockRepo.On("GetByID", user.ID).Return(user, nil)
+
+	// Act
+	response, err := service.GetUserByID(user.ID)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, user, response)
+
+	mockRepo.AssertExpectations(t)
+}
+func TestService_GetUserByID_NotFound(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1}
+
+	mockRepo.On("GetByID", user.ID).Return(nil, nil)
+
+	// Act
+	response, err := service.GetUserByID(user.ID)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, response)
+
+	mockRepo.AssertExpectations(t)
+}
+func TestService_GetUserByID_RepositoryError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1}
+
+	mockRepo.On("GetByID", user.ID).Return(nil, assert.AnError)
+
+	// Act
+	response, err := service.GetUserByID(user.ID)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	assert.Nil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_GetUserByEmail_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1, Email: "email@example.com"}
+
+	mockRepo.On("GetByEmail", user.Email).Return(user, nil)
+
+	// Act
+	response, err := service.GetUserByEmail(user.Email)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, user, response)
+
+	mockRepo.AssertExpectations(t)
+}
+func TestService_GetUserByEmail_NotFound(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1, Email: "email@example.com"}
+
+	mockRepo.On("GetByEmail", user.Email).Return(nil, nil)
+
+	// Act
+	response, err := service.GetUserByEmail(user.Email)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, response)
+
+	mockRepo.AssertExpectations(t)
+}
+func TestService_GetUserByEmail_RepositoryError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	user := &User{ID: 1, Email: "email@example.com"}
+
+	mockRepo.On("GetByEmail", user.Email).Return(nil, assert.AnError)
+
+	// Act
+	response, err := service.GetUserByEmail(user.Email)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	assert.Nil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_GetUsers_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	users := []User{
+		{ID: 1, Email: "email1@example.com"},
+		{ID: 2, Email: "email2@example.com"},
+	}
+
+	mockRepo.On("GetAll").Return(users, nil)
+
+	// Act
+	response, err := service.GetUsers()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, users, response)
+
+	mockRepo.AssertExpectations(t)
+}
+func TestService_GetUsers_RepositoryError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	mockRepo.On("GetAll").Return(nil, assert.AnError)
+
+	// Act
+	response, err := service.GetUsers()
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	assert.Nil(t, response)
+
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_CreateUser_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	email := "email@example.com"
+
+	mockRepo.On("GetByEmail", email).Return(nil, nil)
+	mockRepo.On("Create", &User{Email: email}).Return(nil)
+
+	// Act
+	err := service.CreateUser(email)
+
+	// Assert
+	require.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_CreateUser_EmailAlreadyExists(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	email := "email@example.com"
+
+	mockRepo.On("GetByEmail", email).Return(&User{Email: email}, nil)
+
+	// Act
+	err := service.CreateUser(email)
+
+	// Assert
+	assert.Equal(t, apperror.CodeUserEmailInUse, err.(*apperror.AppError).Code)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_CreateUser_CreateError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	email := "email@example.com"
+
+	mockRepo.On("GetByEmail", email).Return(nil, nil)
+	mockRepo.On("Create", &User{Email: email}).Return(assert.AnError)
+
+	// Act
+	err := service.CreateUser(email)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_UpdateUser_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+	oldEmail := "old-email@example.com"
+	newEmail := "new-email@example.com"
+
+	mockRepo.On("GetByEmail", newEmail).Return(nil, nil)
+	mockRepo.On("GetByID", id).Return(&User{ID: id, Email: oldEmail}, nil)
+	mockRepo.On("Update", &User{ID: id, Email: newEmail}).Return(nil)
+
+	// Act
+	err := service.UpdateUser(id, newEmail)
+
+	// Assert
+	require.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_UpdateUser_EmailAlreadyExists(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+	newEmail := "new-email@example.com"
+
+	mockRepo.On("GetByEmail", newEmail).Return(&User{Email: newEmail}, nil)
+
+	// Act
+	err := service.UpdateUser(id, newEmail)
+
+	// Assert
+	assert.Equal(t, apperror.CodeUserEmailInUse, err.(*apperror.AppError).Code)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_UpdateUser_NotFound(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+	newEmail := "new-email@example.com"
+
+	mockRepo.On("GetByEmail", newEmail).Return(nil, nil)
+	mockRepo.On("GetByID", id).Return(nil, nil)
+
+	// Act
+	err := service.UpdateUser(id, newEmail)
+
+	// Assert
 	assert.Equal(t, apperror.CodeUserNotFound, err.(*apperror.AppError).Code)
-	assert.Nil(t, newUser)
+	mockRepo.AssertExpectations(t)
 }
-func TestUnit_UpdateUser_Deleted(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	u := &User{
-		ID:           1,
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-	}
-	db.DB.Create(u)
-	db.DB.Delete(u)
+func TestService_UpdateUser_UpdateError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
 
-	newUser, err := updateUser(1, &User{
-		Email:        "user2@example.com",
-		Picture:      "https://example.com/picture2.jpg",
-		LastLoginSub: &[]string{"mock-sub2"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(2, 0)}[0],
-	})
-	assert.Error(t, err)
+	id := 1
+	oldEmail := "old-email@example.com"
+	newEmail := "new-email@example.com"
+
+	mockRepo.On("GetByEmail", newEmail).Return(nil, nil)
+	mockRepo.On("GetByID", id).Return(&User{ID: id, Email: oldEmail}, nil)
+	mockRepo.On("Update", &User{ID: id, Email: newEmail}).Return(assert.AnError)
+
+	// Act
+	err := service.UpdateUser(id, newEmail)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestService_DeleteUser_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+
+	mockRepo.On("GetByID", id).Return(&User{ID: id}, nil)
+	mockRepo.On("SoftDelete", id).Return(nil)
+
+	// Act
+	err := service.DeleteUser(id)
+
+	// Assert
+	require.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_DeleteUser_NotFound(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+
+	mockRepo.On("GetByID", id).Return(nil, nil)
+
+	// Act
+	err := service.DeleteUser(id)
+
+	// Assert
 	assert.Equal(t, apperror.CodeUserNotFound, err.(*apperror.AppError).Code)
-	assert.Nil(t, newUser)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_DeleteUser_SoftDeleteError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
 
-	var user User
-	db.DB.Unscoped().Where("id = ?", 1).First(&user)
-	assert.Equal(t, 1, user.ID)
-	assert.Equal(t, "user@example.com", user.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", user.Picture)
-	assert.Equal(t, "mock-sub", *user.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *user.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), user.CreatedAt)
-	assert.Equal(t, time.Unix(1, 0), user.UpdatedAt)
-	assert.InDelta(t, time.Now().Unix(), user.DeletedAt.Time.Unix(), 5)
+	id := 1
+
+	mockRepo.On("GetByID", id).Return(&User{ID: id}, nil)
+	mockRepo.On("SoftDelete", id).Return(assert.AnError)
+
+	// Act
+	err := service.DeleteUser(id)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	mockRepo.AssertExpectations(t)
 }
 
-func TestUnit_DeleteUser_Normal(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
-	db.DB.Create(&User{
-		ID:           1,
-		Email:        "user@example.com",
-		Picture:      "https://example.com/picture.jpg",
-		LastLoginSub: &[]string{"mock-sub"}[0],
-		LastLoginAt:  &[]time.Time{time.Unix(1, 0)}[0],
-		CreatedAt:    time.Unix(1, 0),
-		UpdatedAt:    time.Unix(1, 0),
-	})
+func TestService_RecordUserLogin_Success(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
 
-	err := deleteUser(1)
+	id := 1
+	name := "John Doe"
+	picture := "https://example.com/picture.jpg"
+	loginSub := "google"
+
+	mockRepo.On("GetByID", id).Return(&User{ID: id}, nil)
+	mockRepo.On("Update", mock.MatchedBy(func(u *User) bool {
+		return u != nil &&
+			u.LastLoginAt != nil &&
+			u.ID == id &&
+			*u.Name == name &&
+			*u.Picture == picture &&
+			*u.LastLoginSub == loginSub &&
+			time.Since(*u.LastLoginAt) < time.Second
+	})).Return(nil)
+
+	// Act
+	err := service.RecordUserLogin(id, name, picture, loginSub)
+
+	// Assert
 	require.NoError(t, err)
-
-	var user User
-	db.DB.Unscoped().Where("id = ?", 1).First(&user)
-	assert.Equal(t, 1, user.ID)
-	assert.Equal(t, "user@example.com", user.Email)
-	assert.Equal(t, "https://example.com/picture.jpg", user.Picture)
-	assert.Equal(t, "mock-sub", *user.LastLoginSub)
-	assert.Equal(t, time.Unix(1, 0), *user.LastLoginAt)
-	assert.Equal(t, time.Unix(1, 0), user.CreatedAt)
-	assert.Equal(t, time.Unix(1, 0), user.UpdatedAt)
-	assert.InDelta(t, time.Now().Unix(), user.DeletedAt.Time.Unix(), 5)
+	mockRepo.AssertExpectations(t)
 }
-func TestUnit_DeleteUser_NotFound(t *testing.T) {
-	terminate := test.SetupDB(t, &User{})
-	defer terminate()
 
-	err := deleteUser(1)
-	require.NoError(t, err)
+func TestService_RecordUserLogin_NotFound(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+	name := "John Doe"
+	picture := "https://example.com/picture.jpg"
+	loginSub := "google"
+
+	mockRepo.On("GetByID", id).Return(nil, nil)
+
+	// Act
+	err := service.RecordUserLogin(id, name, picture, loginSub)
+
+	// Assert
+	assert.Equal(t, apperror.CodeUserNotFound, err.(*apperror.AppError).Code)
+	mockRepo.AssertExpectations(t)
+}
+func TestService_RecordUserLogin_UpdateError(t *testing.T) {
+	// Arrange
+	mockRepo := &MockRepository{}
+	service := &service{repo: mockRepo}
+
+	id := 1
+	name := "John Doe"
+	picture := "https://example.com/picture.jpg"
+	loginSub := "google"
+
+	mockRepo.On("GetByID", id).Return(&User{ID: id}, nil)
+	mockRepo.On("Update", mock.MatchedBy(func(u *User) bool {
+		return u != nil &&
+			u.LastLoginAt != nil &&
+			u.ID == id &&
+			*u.Name == name &&
+			*u.Picture == picture &&
+			*u.LastLoginSub == loginSub &&
+			time.Since(*u.LastLoginAt) < time.Second
+	})).Return(assert.AnError)
+
+	// Act
+	err := service.RecordUserLogin(id, name, picture, loginSub)
+
+	// Assert
+	assert.Equal(t, assert.AnError, err)
+	mockRepo.AssertExpectations(t)
 }
