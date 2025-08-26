@@ -2,7 +2,7 @@ package user
 
 import "time"
 
-type RequestUri struct {
+type RequestURI struct {
 	ID int `uri:"id" binding:"required,min=1"`
 }
 

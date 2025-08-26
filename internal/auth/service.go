@@ -37,13 +37,6 @@ func (s *service) GetOAuthLoginURL() string {
 	return s.config.OAuth2.AuthCodeURL("state", oauth2.AccessTypeOffline)
 }
 
-type IDTokenClaims struct {
-	Sub     string
-	Email   string
-	Picture string
-	Name    string
-}
-
 func (s *service) GetOAuthIDTokenClaims(code string) (*OAuthIDTokenClaims, error) {
 	oauthToken, err := s.config.OAuth2.Exchange(context.Background(), code)
 	if err != nil {

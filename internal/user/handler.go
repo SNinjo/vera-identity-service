@@ -46,7 +46,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 }
 
 func (h *Handler) UpdateUser(c *gin.Context) {
-	var uri RequestUri
+	var uri RequestURI
 	if err := c.ShouldBindUri(&uri); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request uri | " + err.Error()})
 		return
@@ -67,7 +67,7 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 }
 
 func (h *Handler) DeleteUser(c *gin.Context) {
-	var req RequestUri
+	var req RequestURI
 	if err := c.ShouldBindUri(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request uri | " + err.Error()})
 		return
