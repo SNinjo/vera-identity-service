@@ -2,8 +2,9 @@ package middleware
 
 import (
 	"strconv"
-	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/config"
+
+	"github.com/sninjo/vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"vera-identity-service/internal/app"
+	"github.com/sninjo/vera-identity-service/internal/app"
 )
 
 func main() {

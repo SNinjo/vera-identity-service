@@ -4,7 +4,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
-	"vera-identity-service/test"
+
+	"github.com/sninjo/vera-identity-service/test"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"

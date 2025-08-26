@@ -2,10 +2,11 @@ package router
 
 import (
 	"net/http"
-	"vera-identity-service/internal/auth"
-	"vera-identity-service/internal/middleware"
-	"vera-identity-service/internal/tool"
-	"vera-identity-service/internal/user"
+
+	"github.com/sninjo/vera-identity-service/internal/auth"
+	"github.com/sninjo/vera-identity-service/internal/middleware"
+	"github.com/sninjo/vera-identity-service/internal/tool"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/gin-gonic/gin"
 )

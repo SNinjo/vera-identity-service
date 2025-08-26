@@ -3,9 +3,10 @@ package auth
 import (
 	"net/http"
 	"strconv"
-	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/config"
-	"vera-identity-service/internal/user"
+
+	"github.com/sninjo/vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/gin-gonic/gin"
 )

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"vera-identity-service/test"
+	"github.com/sninjo/vera-identity-service/test"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"

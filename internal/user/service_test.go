@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/apperror"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

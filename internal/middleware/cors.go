@@ -2,7 +2,8 @@ package middleware
 
 import (
 	"net/http"
-	"vera-identity-service/internal/config"
+
+	"github.com/sninjo/vera-identity-service/internal/config"
 
 	"github.com/gin-gonic/gin"
 )

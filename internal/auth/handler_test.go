@@ -7,9 +7,10 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
-	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/user"
-	"vera-identity-service/test"
+
+	"github.com/sninjo/vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/user"
+	"github.com/sninjo/vera-identity-service/test"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"

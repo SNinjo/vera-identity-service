@@ -12,9 +12,10 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	"vera-identity-service/internal/app"
-	"vera-identity-service/internal/auth"
-	"vera-identity-service/internal/user"
+
+	"github.com/sninjo/vera-identity-service/internal/app"
+	"github.com/sninjo/vera-identity-service/internal/auth"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

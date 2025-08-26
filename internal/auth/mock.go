@@ -2,8 +2,9 @@ package auth
 
 import (
 	"time"
-	"vera-identity-service/internal/config"
-	"vera-identity-service/internal/user"
+
+	"github.com/sninjo/vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/oauth2"

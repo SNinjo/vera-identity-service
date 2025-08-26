@@ -1,7 +1,7 @@
 package db
 
 import (
-	"vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

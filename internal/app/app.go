@@ -1,8 +1,8 @@
 package app
 
 import (
-	"vera-identity-service/internal/auth"
-	"vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/auth"
+	"github.com/sninjo/vera-identity-service/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"

@@ -1,7 +1,7 @@
 package user
 
 import (
-	"vera-identity-service/internal/middleware"
+	"github.com/sninjo/vera-identity-service/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

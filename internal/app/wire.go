@@ -4,14 +4,14 @@
 package app
 
 import (
-	"vera-identity-service/internal/auth"
-	"vera-identity-service/internal/config"
-	"vera-identity-service/internal/db"
-	"vera-identity-service/internal/logger"
-	"vera-identity-service/internal/middleware"
-	"vera-identity-service/internal/router"
-	"vera-identity-service/internal/tool"
-	"vera-identity-service/internal/user"
+	"github.com/sninjo/vera-identity-service/internal/auth"
+	"github.com/sninjo/vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/db"
+	"github.com/sninjo/vera-identity-service/internal/logger"
+	"github.com/sninjo/vera-identity-service/internal/middleware"
+	"github.com/sninjo/vera-identity-service/internal/router"
+	"github.com/sninjo/vera-identity-service/internal/tool"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/google/wire"
 )

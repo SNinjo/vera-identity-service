@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"vera-identity-service/internal/config"
-	"vera-identity-service/internal/db"
-	"vera-identity-service/test"
+	"github.com/sninjo/vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/db"
+	"github.com/sninjo/vera-identity-service/test"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

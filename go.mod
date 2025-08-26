@@ -1,4 +1,4 @@
-module vera-identity-service
+module github.com/sninjo/vera-identity-service
 
 go 1.23.0
 

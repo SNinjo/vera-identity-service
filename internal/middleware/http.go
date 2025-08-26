@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"io"
 	"time"
-	"vera-identity-service/internal/apperror"
+
+	"github.com/sninjo/vera-identity-service/internal/apperror"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

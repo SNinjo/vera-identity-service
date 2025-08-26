@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"vera-identity-service/internal/apperror"
-	"vera-identity-service/internal/config"
-	"vera-identity-service/internal/user"
+	"github.com/sninjo/vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/config"
+	"github.com/sninjo/vera-identity-service/internal/user"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"

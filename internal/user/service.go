@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"vera-identity-service/internal/apperror"
+	"github.com/sninjo/vera-identity-service/internal/apperror"
 )
 
 type Service interface {
