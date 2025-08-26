@@ -18,12 +18,18 @@ func logRequest(c *gin.Context, logger *zap.Logger, requestID string) {
 	method := c.Request.Method
 	path := c.Request.URL.Path
 	query := c.Request.URL.RawQuery
+
 	cookies := c.Request.Cookies()
 	cookieStrs := make([]string, len(cookies))
 	for i, c := range c.Request.Cookies() {
-		cookieStrs[i] = c.Name + "=" + c.Value
+		cookieStrs[i] = c.Name + "=***REDACTED***"
 	}
+
 	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		authHeader = "***REDACTED***"
+	}
+
 	var bodyBytes []byte
 	if c.Request.Body != nil {
 		bodyBytes, _ = io.ReadAll(c.Request.Body)
