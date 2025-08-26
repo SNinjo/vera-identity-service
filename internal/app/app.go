@@ -35,6 +35,8 @@ func NewApp(
 
 func (a *App) Close() {
 	a.Logger.Sync()
+	d, _ := a.DB.DB()
+	d.Close()
 }
 
 func (a *App) Run() {
