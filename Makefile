@@ -56,4 +56,4 @@ migrate-force:
 	migrate -path migrations -database "$(MIGRATION_URL)" force $(version)
 
 insert-user-to-db:
-	psql "$$DATABASE_URL" -c "INSERT INTO users (email) VALUES ('$(email)');"
+	psql "$$DATABASE_URL" -c "INSERT INTO users (email, created_at, updated_at) VALUES ('$(email)', now(), now());"
