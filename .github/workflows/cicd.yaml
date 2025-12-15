@@ -6,6 +6,7 @@ on:
       - 'v*'
 
 env:
+  ARGOCD_APP: identity
   IMAGE_REFERENCE: ${{ secrets.HARBOR_REGISTRY }}/vera/identity-service:${{ github.ref_name }}
 
 jobs:
@@ -14,9 +15,9 @@ jobs:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Checkout
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v6
   #     - name: Setup Go
-  #       uses: actions/setup-go@v5
+  #       uses: actions/setup-go@v6
   #       with:
   #         go-version-file: go.mod
   #         cache: true
@@ -33,7 +34,7 @@ jobs:
       image: ${{ steps.image_ref.outputs.image }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -45,63 +46,33 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           file: ./Dockerfile
           tags: ${{ env.IMAGE_REFERENCE }}
 
-  # update-argocd:
-  #   name: Update Kustomize repo and trigger Argo CD
-  #   runs-on: ubuntu-latest
-  #   needs: build-and-push
-  #   if: needs.build-and-push.result == 'success'
-  #   steps:
-  #     - name: Checkout deployment repo
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: ${{ secrets.KUSTOMIZE_REPOSITORY }}
-  #         token: ${{ secrets.KUSTOMIZE_REPOSITORY_TOKEN }}
-  #         path: deployment
-  #     - name: Setup Kustomize
-  #       uses: imranismail/setup-kustomize@v2
-  #       with:
-  #         kustomize-version: v5.3.0
-  #     - name: Update container tag
-  #       working-directory: deployment/${{ env.KUSTOMIZE_PATH }}
-  #       run: |
-  #         kustomize edit set image ${{ env.KUSTOMIZE_IMAGE_NAME }}=${{ secrets.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.HARBOR_REPOSITORY }}:${{ github.ref_name }}
-  #     - name: Commit manifest change
-  #       working-directory: deployment
-  #       env:
-  #         GIT_USER_NAME: ${{ secrets.DEPLOY_GIT_USER }}
-  #         GIT_USER_EMAIL: ${{ secrets.DEPLOY_GIT_EMAIL }}
-  #       run: |
-  #         git config user.name "$GIT_USER_NAME"
-  #         git config user.email "$GIT_USER_EMAIL"
-  #         if git diff --quiet; then
-  #           echo "No manifest change detected; skipping commit."
-  #           exit 0
-  #         fi
-  #         git commit -am "chore: update identity image to ${{ needs.build-and-push.outputs.image }}"
-  #         git push
-  #     - name: Install Argo CD CLI
-  #       run: |
-  #         curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-  #         sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-  #         rm argocd-linux-amd64
-  #     - name: Trigger Argo CD sync
-  #       env:
-  #         ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
-  #         ARGOCD_USERNAME: ${{ secrets.ARGOCD_USERNAME }}
-  #         ARGOCD_PASSWORD: ${{ secrets.ARGOCD_PASSWORD }}
-  #         ARGOCD_APP_NAME: ${{ secrets.ARGOCD_APP_NAME }}
-  #       run: |
-  #         argocd login "$ARGOCD_SERVER" \
-  #           --username "$ARGOCD_USERNAME" \
-  #           --password "$ARGOCD_PASSWORD" \
-  #           --insecure \
-  #           --grpc-web
-  #         argocd app sync "$ARGOCD_APP_NAME"
-  #         argocd app wait "$ARGOCD_APP_NAME" --timeout 180
+  deploy:
+    name: Deploy to ArgoCD
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    env:
+      ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+      ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+      ARGOCD_OPTS: --grpc-web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set image tag (Kustomize)
+        uses: clowdhaus/argo-cd-action@v3.2.0
+        with:
+          version: 3.2.1
+          command: app
+          options: set ${{ env.ARGOCD_APP }} --kustomize-image ${{ env.IMAGE_REFERENCE }}
+      - name: Sync ArgoCD app
+        uses: clowdhaus/argo-cd-action@v3.2.0
+        with:
+          version: 3.2.1
+          command: app
+          options: sync ${{ env.ARGOCD_APP }}
