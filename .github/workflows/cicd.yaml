@@ -70,9 +70,21 @@ jobs:
           version: 3.2.1
           command: app
           options: set ${{ env.ARGOCD_APP }} --kustomize-image ${{ env.IMAGE_REFERENCE }}
+      - name: Wait for operation
+        uses: clowdhaus/argo-cd-action@v3.2.0
+        with:
+          version: 3.2.1
+          command: app
+          options: wait ${{ env.ARGOCD_APP }} --operation --timeout 600
       - name: Sync ArgoCD app
         uses: clowdhaus/argo-cd-action@v3.2.0
         with:
           version: 3.2.1
           command: app
           options: sync ${{ env.ARGOCD_APP }}
+      - name: Wait for health
+        uses: clowdhaus/argo-cd-action@v3.2.0
+        with:
+          version: 3.2.1
+          command: app
+          options: wait ${{ env.ARGOCD_APP }} --health --timeout 600
